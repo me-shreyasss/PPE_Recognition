@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Run Python Script</title>
+
+    <script>
+        function runPythonScript() {
+            fetch('/run-script', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.result);
+            })
+        }
+    </script>
+</head>
+
+<body>
+    
+    <main>
+        <form id="upload-form" action="http://localhost:5000/run-script" method="POST" enctype="multipart/form-data">
+            <label for="file">Choose a file:</label>
+            <input type="file" id="file" name="file" required>
+            <button type="submit">Submit</button>
+        </form>
+    </main>
+</body>
+</html>
