@@ -3,32 +3,579 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Run Python Script</title>
-
-    <script>
-        function runPythonScript() {
-            fetch('/run-script', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            })
-            .then(response => response.json())
-            .then(data => {
-                alert(data.result);
-            })
+    <title>PPE Detection — Food SafeAI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0c10;
+            --surface: #12151c;
+            --surface2: #1a1e28;
+            --border: #2a2f3d;
+            --accent: #00e5ff;
+            --accent2: #ff3d57;
+            --green: #00ff88;
+            --text: #e8ecf4;
+            --muted: #6b7280;
+            --font-mono: 'Space Mono', monospace;
+            --font-body: 'DM Sans', sans-serif;
         }
-    </script>
-</head>
 
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-body);
+            min-height: 100vh;
+        }
+
+        /* ─── Header ─── */
+        header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 32px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo-badge {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, var(--accent), #0066ff);
+            border-radius: 8px;
+            display: grid; place-items: center;
+            font-family: var(--font-mono);
+            font-size: 12px; font-weight: 700;
+            color: #000;
+        }
+
+        header h1 {
+            font-size: 1rem; font-weight: 600;
+            letter-spacing: 0.05em;
+        }
+
+        header span {
+            font-size: 0.75rem;
+            color: var(--muted);
+            font-family: var(--font-mono);
+        }
+
+        .status-dot {
+            margin-left: auto;
+            display: flex; align-items: center; gap: 8px;
+            font-size: 0.8rem; color: var(--muted);
+            font-family: var(--font-mono);
+        }
+
+        .dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--muted);
+            transition: background 0.3s;
+        }
+
+        .dot.live { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 1.5s infinite; }
+        .dot.error { background: var(--accent2); }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* ─── Layout ─── */
+        main {
+            padding: 32px;
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* ─── Cards ─── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; gap: 10px;
+        }
+
+        .card-header h2 {
+            font-size: 0.85rem;
+            font-family: var(--font-mono);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .card-body { padding: 20px; }
+
+        /* ─── Video Section ─── */
+        .video-wrapper {
+            position: relative;
+            background: #000;
+            aspect-ratio: 16/9;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        #videoFeed {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            display: none;
+        }
+
+        #videoFeed.active { display: block; }
+
+        .video-placeholder {
+            text-align: center;
+            color: var(--muted);
+        }
+
+        .video-placeholder .icon {
+            font-size: 3rem;
+            margin-bottom: 12px;
+            opacity: 0.4;
+        }
+
+        .video-placeholder p {
+            font-size: 0.85rem;
+            font-family: var(--font-mono);
+        }
+
+        /* Corner overlay labels */
+        .video-overlay {
+            position: absolute;
+            top: 12px; left: 12px;
+            background: rgba(0,0,0,0.7);
+            border: 1px solid var(--accent);
+            border-radius: 4px;
+            padding: 4px 10px;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--accent);
+            display: none;
+        }
+
+        .video-overlay.show { display: block; }
+
+        /* ─── Controls ─── */
+        .controls {
+            display: flex; gap: 12px;
+            margin-top: 16px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none; border-radius: 8px;
+            font-family: var(--font-mono);
+            font-size: 0.8rem; font-weight: 700;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #000;
+        }
+
+        .btn-primary:hover { background: #33ecff; transform: translateY(-1px); }
+        .btn-primary:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; transform: none; }
+
+        .btn-danger {
+            background: transparent;
+            color: var(--accent2);
+            border: 1px solid var(--accent2);
+        }
+
+        .btn-danger:hover { background: var(--accent2); color: #fff; }
+        .btn-danger:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        /* ─── Upload Section ─── */
+        .drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 32px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: var(--accent);
+            background: rgba(0,229,255,0.04);
+        }
+
+        .drop-zone input[type="file"] {
+            position: absolute; inset: 0;
+            opacity: 0; cursor: pointer;
+        }
+
+        .drop-zone .upload-icon { font-size: 2rem; margin-bottom: 10px; opacity: 0.5; }
+        .drop-zone p { font-size: 0.8rem; color: var(--muted); }
+        .drop-zone strong { color: var(--accent); font-size: 0.85rem; }
+
+        #uploadBtn {
+            width: 100%;
+            margin-top: 12px;
+            background: var(--surface2);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        #uploadBtn:hover { border-color: var(--accent); color: var(--accent); }
+
+        /* ─── Result Preview ─── */
+        #resultContainer { display: none; }
+
+        #resultContainer.show { display: block; }
+
+        #resultImg {
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin-top: 12px;
+        }
+
+        /* ─── Log ─── */
+        #log {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 12px;
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            color: var(--muted);
+            max-height: 120px;
+            overflow-y: auto;
+            margin-top: 12px;
+        }
+
+        #log .entry { margin-bottom: 4px; }
+        #log .entry.ok { color: var(--green); }
+        #log .entry.err { color: var(--accent2); }
+        #log .entry.info { color: var(--accent); }
+
+        /* ─── Sidebar Stats ─── */
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .stat {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .stat .label {
+            font-size: 0.65rem;
+            font-family: var(--font-mono);
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 4px;
+        }
+
+        .stat .value {
+            font-size: 1.4rem;
+            font-weight: 600;
+            font-family: var(--font-mono);
+            color: var(--accent);
+        }
+
+        /* ─── Instructions ─── */
+        .steps {
+            list-style: none;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+
+        .steps li {
+            display: flex; gap: 12px; align-items: flex-start;
+            font-size: 0.82rem; color: var(--muted);
+        }
+
+        .steps li .num {
+            min-width: 22px; height: 22px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            display: grid; place-items: center;
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            color: var(--accent);
+        }
+
+        /* ─── Responsive ─── */
+        @media (max-width: 900px) {
+            main { grid-template-columns: 1fr; padding: 16px; }
+        }
+    </style>
+</head>
 <body>
-    
-    <main>
-        <form id="upload-form" action="http://localhost:5000/run-script" method="POST" enctype="multipart/form-data">
-            <label for="file">Choose a file:</label>
-            <input type="file" id="file" name="file" required>
-            <button type="submit">Submit</button>
-        </form>
-    </main>
+
+<header>
+    <div class="logo-badge">PPE</div>
+    <div>
+        <h1>Food SafeAI — PPE Detection</h1>
+        <span>Powered by Roboflow CV Model</span>
+    </div>
+    <div class="status-dot">
+        <div class="dot" id="statusDot"></div>
+        <span id="statusText">IDLE</span>
+    </div>
+</header>
+
+<main>
+    <!-- LEFT: Video + Upload -->
+    <div>
+        <!-- Live Stream -->
+        <div class="card" style="margin-bottom: 24px;">
+            <div class="card-header">
+                <h2>🎥 Live Stream Detection</h2>
+            </div>
+            <div class="card-body">
+                <div class="video-wrapper">
+                    <div class="video-placeholder" id="placeholder">
+                        <div class="icon">📷</div>
+                        <p>Stream is not active</p>
+                        <p style="margin-top:6px; font-size:0.72rem;">Click START STREAM to begin</p>
+                    </div>
+                    <img id="videoFeed" src="" alt="Live PPE Detection Feed">
+                    <div class="video-overlay" id="liveLabel">● LIVE DETECTION</div>
+                </div>
+                <div class="controls">
+                    <button class="btn btn-primary" id="startBtn" onclick="startStream()">▶ Start Stream</button>
+                    <button class="btn btn-danger" id="stopBtn" onclick="stopStream()" disabled>■ Stop Stream</button>
+                </div>
+                <div id="log">
+                    <div class="entry info">// System ready. Waiting for input...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Image Upload -->
+        <div class="card">
+            <div class="card-header">
+                <h2>📁 Single Image Analysis</h2>
+            </div>
+            <div class="card-body">
+                <div class="drop-zone" id="dropZone">
+                    <input type="file" id="fileInput" accept="image/*" onchange="handleFileSelect(event)">
+                    <div class="upload-icon">⬆</div>
+                    <p><strong>Click to upload</strong> or drag & drop</p>
+                    <p>JPG, PNG, WEBP supported</p>
+                </div>
+                <button class="btn btn-primary" id="uploadBtn" onclick="uploadImage()" disabled>Analyze Image</button>
+
+                <div id="resultContainer">
+                    <p style="font-size:0.8rem; color:var(--muted); margin-top:16px; font-family:var(--font-mono);">// PREDICTION OUTPUT</p>
+                    <img id="resultImg" src="" alt="Prediction result">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT: Sidebar -->
+    <div>
+        <div class="card" style="margin-bottom: 24px;">
+            <div class="card-header"><h2>📊 Session Stats</h2></div>
+            <div class="card-body">
+                <div class="stat-grid">
+                    <div class="stat">
+                        <div class="label">Frames</div>
+                        <div class="value" id="frameCount">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="label">Images</div>
+                        <div class="value" id="imgCount">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="label">Mode</div>
+                        <div class="value" style="font-size:0.9rem; color:var(--muted)" id="modeLabel">IDLE</div>
+                    </div>
+                    <div class="stat">
+                        <div class="label">Confidence</div>
+                        <div class="value">50%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h2>ℹ How to Use</h2></div>
+            <div class="card-body">
+                <ul class="steps">
+                    <li>
+                        <span class="num">1</span>
+                        <span>Click <strong style="color:var(--accent)">Start Stream</strong> to activate your webcam and begin real-time PPE detection.</span>
+                    </li>
+                    <li>
+                        <span class="num">2</span>
+                        <span>Bounding boxes will appear around detected items. <span style="color:var(--green)">Green</span> = PPE present, <span style="color:var(--accent2)">Red</span> = violation.</span>
+                    </li>
+                    <li>
+                        <span class="num">3</span>
+                        <span>Click <strong style="color:var(--accent2)">Stop Stream</strong> to end the session and free the camera.</span>
+                    </li>
+                    <li>
+                        <span class="num">4</span>
+                        <span>Alternatively, upload a single image for one-time analysis using the upload panel.</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+    let frameCount = 0;
+    let imgCount = 0;
+    let frameInterval = null;
+
+    function log(msg, type = 'info') {
+        const el = document.getElementById('log');
+        const entry = document.createElement('div');
+        entry.className = `entry ${type}`;
+        entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        el.appendChild(entry);
+        el.scrollTop = el.scrollHeight;
+    }
+
+    function setStatus(state) {
+        const dot = document.getElementById('statusDot');
+        const text = document.getElementById('statusText');
+        const mode = document.getElementById('modeLabel');
+        dot.className = 'dot ' + state;
+        text.textContent = state === 'live' ? 'LIVE' : state === 'error' ? 'ERROR' : 'IDLE';
+        mode.textContent = state === 'live' ? 'STREAM' : 'IDLE';
+    }
+
+    async function startStream() {
+        try {
+            log('Requesting stream start...', 'info');
+            const res = await fetch('/start-stream', { method: 'POST' });
+            const data = await res.json();
+
+            if (data.status) {
+                const feed = document.getElementById('videoFeed');
+                const placeholder = document.getElementById('placeholder');
+                const liveLabel = document.getElementById('liveLabel');
+
+                // Set the src to the streaming endpoint
+                feed.src = '/video-stream?' + Date.now();
+                feed.classList.add('active');
+                placeholder.style.display = 'none';
+                liveLabel.classList.add('show');
+
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                setStatus('live');
+                log('Stream started. PPE detection active.', 'ok');
+
+                // Count frames roughly
+                frameInterval = setInterval(() => {
+                    frameCount++;
+                    document.getElementById('frameCount').textContent = frameCount;
+                }, 100);
+            }
+        } catch (err) {
+            log('Failed to start stream: ' + err.message, 'err');
+            setStatus('error');
+        }
+    }
+
+    async function stopStream() {
+        try {
+            const res = await fetch('/stop-stream', { method: 'POST' });
+            const data = await res.json();
+
+            const feed = document.getElementById('videoFeed');
+            feed.src = '';
+            feed.classList.remove('active');
+            document.getElementById('placeholder').style.display = 'block';
+            document.getElementById('liveLabel').classList.remove('show');
+
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            setStatus('idle');
+            log('Stream stopped.', 'info');
+
+            if (frameInterval) clearInterval(frameInterval);
+        } catch (err) {
+            log('Failed to stop stream: ' + err.message, 'err');
+        }
+    }
+
+    let selectedFile = null;
+
+    function handleFileSelect(event) {
+        selectedFile = event.target.files[0];
+        if (selectedFile) {
+            document.getElementById('uploadBtn').disabled = false;
+            log(`File selected: ${selectedFile.name}`, 'info');
+        }
+    }
+
+    // Drag and drop support
+    const dropZone = document.getElementById('dropZone');
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        const files = e.dataTransfer.files;
+        if (files.length) {
+            selectedFile = files[0];
+            document.getElementById('uploadBtn').disabled = false;
+            log(`File dropped: ${selectedFile.name}`, 'info');
+        }
+    });
+
+    async function uploadImage() {
+        if (!selectedFile) return;
+
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+
+        document.getElementById('uploadBtn').disabled = true;
+        log(`Uploading ${selectedFile.name} for analysis...`, 'info');
+
+        try {
+            const res = await fetch('/run-script', { method: 'POST', body: formData });
+            const data = await res.json();
+
+            if (data.prediction_image) {
+                const container = document.getElementById('resultContainer');
+                const img = document.getElementById('resultImg');
+                img.src = data.prediction_image;
+                container.classList.add('show');
+                imgCount++;
+                document.getElementById('imgCount').textContent = imgCount;
+                log('Prediction complete. Result shown below.', 'ok');
+            } else {
+                log('Error: ' + (data.error || 'Unknown error'), 'err');
+            }
+        } catch (err) {
+            log('Upload failed: ' + err.message, 'err');
+        }
+
+        document.getElementById('uploadBtn').disabled = false;
+    }
+</script>
 </body>
 </html>
